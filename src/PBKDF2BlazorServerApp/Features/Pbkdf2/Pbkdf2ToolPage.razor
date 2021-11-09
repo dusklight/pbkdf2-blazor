@@ -1,0 +1,113 @@
+﻿@page "/pbkdf2tool"
+@using System.Security.Cryptography
+@using Microsoft.AspNetCore.Cryptography.KeyDerivation
+
+<h3>PBKDF2 Tool</h3>
+
+<div class="row mt-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h4>PBKDF2 Password Hash Generator</h4>
+            </div>
+            <div class="card-body">
+                <EditForm EditContext="@pbkdf2EditContext">
+                    <DataAnnotationsValidator />
+    
+                    <div class="form-group">
+                        <label for="textToHash">Text to Hash: </label>
+                        <InputText id="textToHash" @bind-Value="pbkdf2Model.TextToHash" class="form-control" DisplayName="Text to Hash"/>
+                        <ValidationMessage For="@(() => pbkdf2Model.TextToHash)" />
+                    </div>
+
+                    <div class="form-group row">
+                        <div class="col-sm-7">
+                            <label for="saltBase64">Salt in Base64 Format:</label>
+                            <InputText id="saltBase64" @bind-Value="pbkdf2Model.SaltBase64" class="form-control" DisplayName="Salt in Base64" />
+                            <ValidationMessage For="@(() => pbkdf2Model.SaltBase64)" />
+                        </div>
+                        <div class="col-sm-5">
+                            <label for="saltSizeBytes">Salt Size in Bytes:</label>
+                            <div class="input-group">
+                                <InputNumber id="saltSizeBytes" @bind-Value="pbkdf2Model.SaltSizeBytes" class="form-control"/>
+                                <div class="input-group-append">
+                                    <button type="button" id="generateSaltButton" class="btn btn-secondary" @onclick='HandleGenerateSalt'>Generate Salt</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group row">
+                        <div class="col-sm-6">
+                            <label for="iterationCount">Iteration Count:</label>
+                            <InputNumber id="iterationCount" @bind-Value="pbkdf2Model.IterationCount" class="form-control" DisplayName="Iteration Count" />
+                            <ValidationMessage For="@(() => pbkdf2Model.IterationCount)" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="hashSizeBytes">Hash Size in Bytes:</label>
+                            <InputNumber id="hashSizeBytes" @bind-Value="pbkdf2Model.HashSizeBytes" class="form-control" DisplayName="Hash Size in Bytes" />
+                            <ValidationMessage For="@(() => pbkdf2Model.HashSizeBytes)" />
+                        </div>
+                    </div>
+
+                    <button type="button" id="generateHashButton" class="btn btn-primary mr-1" @onclick='HandleGenerateHash'><span class="oi oi-bolt" aria-hidden="true"></span> Generate Hash</button>
+                </EditForm>
+            </div>
+        @if (!@String.IsNullOrEmpty(hashResult))
+        {
+            <div class="card-header">
+                Result: <strong><span class="text-monospace" id="hashResult">@hashResult</span></strong>
+            </div>
+        }
+        </div>
+    </div>
+    <div class="col-4 d-none d-xl-block">
+    </div>
+</div>
+
+
+@code {
+
+    private Pbkdf2Model pbkdf2Model = new();
+    private EditContext pbkdf2EditContext { get; set; }
+    private string hashResult { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        pbkdf2EditContext = new EditContext(pbkdf2Model);
+    }
+
+    private void HandleGenerateSalt()
+    {
+        // Note that we're skipping the full model validation in this method, since this is just for generating the salt.
+
+        var model = (Pbkdf2Model)pbkdf2EditContext.Model;
+
+        var saltSizeBytes = model.SaltSizeBytes ?? 16;  // If the field is empty, set to Keycloak default instead of erroring out.
+
+        var saltBytes = new byte[saltSizeBytes];
+
+        RandomNumberGenerator.Fill(saltBytes);
+
+        model.SaltSizeBytes = saltSizeBytes;
+        model.SaltBase64 = Convert.ToBase64String(saltBytes);
+    }
+
+    private void HandleGenerateHash()
+    {
+        if (!pbkdf2EditContext.Validate())
+        {
+            return;
+        }
+
+        var model = (Pbkdf2Model)pbkdf2EditContext.Model;
+
+        var saltBytes = Convert.FromBase64String(model.SaltBase64);
+
+        var hashBytes = KeyDerivation.Pbkdf2(model.TextToHash, saltBytes, KeyDerivationPrf.HMACSHA256, model.IterationCount, model.HashSizeBytes);
+
+        hashResult = Convert.ToBase64String(hashBytes);
+    }
+}

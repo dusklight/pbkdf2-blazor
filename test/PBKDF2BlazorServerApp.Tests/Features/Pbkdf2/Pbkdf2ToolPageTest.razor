@@ -1,0 +1,76 @@
+﻿@using PBKDF2BlazorServerApp.Features.Pbkdf2
+@using AngleSharp.Diffing.Core
+@using FluentAssertions
+
+@inherits TestContext
+@code {
+
+    [Fact]
+    public void GenerateHash_EmptyText_ShouldShowValidationMessage()
+    {
+        // Arrange
+        var cut = Render(@<Pbkdf2ToolPage />);
+
+        var generateHashButtonElement = cut.Find("#generateHashButton");
+
+        // Act
+        generateHashButtonElement.Click();
+
+        // Assert
+        var diffs = cut.GetChangesSinceFirstRender();
+
+        var elementDiff = diffs.Where(d => d.Target == DiffTarget.Element).FirstOrDefault();
+        elementDiff.Should().NotBeNull();
+
+        elementDiff.ShouldBeAddition("<div class='validation-message'>The TextToHash field is required.</div>");
+    }
+    
+    [Fact]
+    public void GenerateHash_ValidForm_ShouldGenerateHash()
+    {
+        // Arrange
+        var cut = Render(@<Pbkdf2ToolPage />);
+
+        var generateHashButtonElement = cut.Find("#generateHashButton");
+
+        // Act
+        cut.Find("#textToHash").Change("password");
+        cut.Find("#saltBase64").Change("NgpNOs7YF2u2bQ==");
+        cut.Find("#iterationCount").Change("20");
+        cut.Find("#hashSizeBytes").Change("30");
+
+        generateHashButtonElement.Click();
+
+        // Assert
+        var resultElement = cut.Find("#hashResult");
+
+        resultElement.TextContent.Should().Be("fq1clzQeOThAQ/VbPx7hkOH2PFyEILU+AtDc9Mb0");
+    }
+
+    [Fact]
+    public void GenerateSalt_ValidSaltSize_ShouldGenerateSalt()
+    {
+        const int SALT_SIZE_IN_BYTES = 30;
+
+        // Arrange
+        var cut = Render(@<Pbkdf2ToolPage />);
+
+        var generateSaltButtonElement = cut.Find("#generateSaltButton");
+
+        // Act
+        cut.Find("#saltSizeBytes").Change(SALT_SIZE_IN_BYTES.ToString());
+
+        generateSaltButtonElement.Click();
+
+        // Assert
+        var saltResultInBase64 = cut.Find("#saltBase64").GetAttribute("value");
+
+        saltResultInBase64.Should().NotBeNullOrWhiteSpace();
+
+        var saltBytes = Convert.FromBase64String(saltResultInBase64);
+        
+        saltBytes.Length.Should().Be(SALT_SIZE_IN_BYTES);
+    }
+
+    // TODO: Additional scenarios can be added, such as all fields being empty, red border around invalid text fields, etc.
+}
